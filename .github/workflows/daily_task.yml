@@ -1,0 +1,36 @@
+name: Auto Screenshot Daily
+
+on:
+  schedule:
+    # Chạy vào 01:00 UTC (tức 08:00 sáng giờ Việt Nam)
+    - cron: '0 1 * * *' 
+  workflow_dispatch: # Cho phép bạn bấm nút chạy thử thủ công
+
+jobs:
+  screenshot:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.9'
+
+      - name: Install dependencies
+        run: |
+          pip install playwright
+          playwright install chromium
+          playwright install-deps
+
+      - name: Run script
+        run: python script.py
+
+      - name: Commit and Push screenshot
+        run: |
+          git config --global user.name "GitHub Action"
+          git config --global user.email "action@github.com"
+          git add *.png
+          git commit -m "Auto screenshot at $(date)" || exit 0
+          git push
