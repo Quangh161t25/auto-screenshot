@@ -4,41 +4,51 @@ import datetime
 
 async def run():
     async with async_playwright() as p:
-        # Khởi tạo trình duyệt
         browser = await p.chromium.launch(headless=True)
-        context = await browser.new_context(
-            viewport={'width': 1280, 'height': 800} # Đặt kích thước màn hình
-        )
+        context = await browser.new_context(viewport={'width': 1280, 'height': 800})
         page = await context.new_page()
         
-        print("Đang truy cập trang quản trị...")
-        await page.goto('https://phanmem.wameli.vn/admin/')
+        try:
+            print("Đang truy cập: https://phanmem.wameli.vn/admin/")
+            await page.goto('https://phanmem.wameli.vn/admin/', timeout=60000)
+            
+            # Đợi trang ổn định
+            await page.wait_for_load_state("networkidle")
+
+            # 1. Tìm và điền Username (thử nhiều cách)
+            # Tìm ô input có chữ "Tài khoản", "Username" hoặc là ô nhập liệu đầu tiên
+            user_input = page.locator('input[name*="user"], input[name*="login"], input[type="text"]').first
+            await user_input.fill("Admin")
+            print("Đã điền Username")
+
+            # 2. Tìm và điền Password
+            pass_input = page.locator('input[name*="pass"], input[type="password"]').first
+            await pass_input.fill("anhtuyen123321")
+            print("Đã điền Password")
+
+            # 3. Tìm nút Đăng nhập và Click
+            # Tìm nút có chữ "Đăng nhập", "Login" hoặc nút Submit
+            login_button = page.locator('button:has-text("Đăng nhập"), button[type="submit"], input[type="submit"]').first
+            await login_button.click()
+            print("Đã nhấn nút Đăng nhập")
+
+            # Đợi chuyển trang
+            await page.wait_for_timeout(7000) 
+            
+            # Chụp ảnh kết quả
+            now = (datetime.datetime.utcnow() + datetime.timedelta(hours=7)).strftime("%Y-%m-%d_%H-%M")
+            filename = f"admin_check_{now}.png"
+            await page.screenshot(path=filename, full_page=True)
+            print(f"Thành công! Đã lưu: {filename}")
+
+        except Exception as e:
+            # Nếu lỗi, chụp ảnh màn hình lỗi để bạn biết nó đang đứng ở đâu
+            print(f"Lỗi xảy ra: {e}")
+            await page.screenshot(path="error_debug.png")
+            print("Đã lưu ảnh lỗi 'error_debug.png' để kiểm tra.")
         
-        # Đợi các ô nhập liệu xuất hiện
-        await page.wait_for_selector('input[name="username"]', timeout=10000)
-        
-        # Điền thông tin đăng nhập
-        print("Đang điền thông tin đăng nhập...")
-        await page.fill('input[name="username"]', "Admin")
-        await page.fill('input[name="password"]', "anhtuyen123321")
-        
-        # Nhấn nút Đăng nhập (thường là button type="submit")
-        # Nếu nút có tên khác, Playwright sẽ cố gắng tìm nút Click được
-        await page.click('button[type="submit"]')
-        
-        # Đợi 5 giây để trang load sau khi đăng nhập thành công
-        print("Đăng nhập thành công, đang đợi tải dữ liệu...")
-        await page.wait_for_timeout(5000)
-        
-        # Đặt tên file theo ngày giờ Việt Nam (UTC+7)
-        now = (datetime.datetime.utcnow() + datetime.timedelta(hours=7)).strftime("%Y-%m-%d_%H-%M")
-        filename = f"admin_dashboard_{now}.png"
-        
-        # Chụp toàn bộ trang
-        await page.screenshot(path=filename, full_page=True)
-        print(f"Đã lưu ảnh: {filename}")
-        
-        await browser.close()
+        finally:
+            await browser.close()
 
 if __name__ == "__main__":
     asyncio.run(run())
